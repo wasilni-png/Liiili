@@ -5,22 +5,21 @@ from flask import Flask
 from threading import Thread
 from telethon import TelegramClient
 
-# --- إعدادات Flask لإرضاء Render ---
+# --- إعدادات Flask لإبقاء السيرفر مستيقظاً ---
 app = Flask('')
 
 @app.route('/')
 def home():
-    return "البوت يعمل بنجاح!"
+    return "Bot is Running!"
 
 def run_flask():
-    # ريندر يرسل رقم المنفذ في متغير PORT
-    port = int(os.environ.get("PORT", 8080))
+    # ريندر يستخدم المنفذ 10000 تلقائياً أو PORT المحجوز
+    port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
 
 # --- إعدادات التليجرام ---
-# يفضل وضعها في Environment Variables على ريندر
-api_id = 33888256  # استبدله بـ ID الخاص بك
-api_hash = 'bb1902689a7e203a7aedadb806c08854' # استبدله بـ Hash الخاص بك
+api_id = 33888256  # ضع رقمك هنا
+api_hash = 'bb1902689a7e203a7aedadb806c08854' # ضع الهاش هنا
 
 ad_message = """
 <b>🌟 التميز والاحترافية لخدمتكم 🌟</b>
@@ -38,36 +37,48 @@ ad_message = """
 
 ──────────────────
 📞 <b>للتواصل والاستفسار (اتصال أو واتساب):</b>
-<code>0566187430</code>
+<code>+0566187430</code>
 """
 
-client = TelegramClient('session_name', api_id, api_hash)
+# ملاحظة: أضفنا receive_updates=False لحل مشكلة Constructor ID نهائياً
+client = TelegramClient('session_name', api_id, api_hash, receive_updates=False)
 
 async def send_ads():
+    print("⏳ جاري محاولة الاتصال بتيليجرام...")
     await client.start()
-    print("✅ تم تشغيل اليوزربوت...")
+    me = await client.get_me()
+    print(f"✅ تم تسجيل الدخول باسم: {me.first_name}")
     
     while True:
-        # جلب المجموعات في كل دورة لتحديث القائمة
-        groups = []
-        async for dialog in client.iter_dialogs():
-            if dialog.is_group:
-                groups.append(dialog)
-        
-        print(f"📊 بدء دورة جديدة على {len(groups)} مجموعة.")
-        
-        for i in range(0, len(groups), 2):
-            batch = groups[i:i+2]
-            for group in batch:
-                try:
-                    await client.send_message(group, ad_message, parse_mode='html')
-                    print(f"✅ أرسل إلى: {group.title}")
-                except Exception as e:
-                    print(f"❌ خطأ في {group.title}: {e}")
+        try:
+            # جلب المجموعات
+            groups = []
+            async for dialog in client.iter_dialogs():
+                if dialog.is_group:
+                    groups.append(dialog)
             
-            wait_time = random.randint(60, 120)
-            print(f"⏳ انتظار {wait_time} ثانية...")
-            await asyncio.sleep(wait_time)
+            print(f"📊 تم العثور على {len(groups)} مجموعة. بدء الإرسال...")
+            
+            for i in range(0, len(groups), 2):
+                batch = groups[i:i+2]
+                for group in batch:
+                    try:
+                        await client.send_message(group, ad_message, parse_mode='html')
+                        print(f"✔️ تم الإرسال إلى: {group.title}")
+                    except Exception as e:
+                        print(f"⚠️ فشل الإرسال لـ {group.title}: {e}")
+                
+                # الانتظار بين دقيقة ودقيقتين
+                wait_time = random.randint(60, 120)
+                print(f"⏳ انتظار {wait_time} ثانية قبل الدفعة التالية...")
+                await asyncio.sleep(wait_time)
+            
+            print("🔁 انتهت الدورة. الانتظار 5 دقائق قبل البدء من جديد...")
+            await asyncio.sleep(300) 
+
+        except Exception as e:
+            print(f"❌ خطأ غير متوقع في الحلقة الرئيسية: {e}")
+            await asyncio.sleep(30) # انتظار بسيط قبل إعادة المحاولة
 
 def start_bot_loop():
     loop = asyncio.new_event_loop()
@@ -75,9 +86,10 @@ def start_bot_loop():
     loop.run_until_complete(send_ads())
 
 if __name__ == "__main__":
-    # تشغيل Flask في خيط منفصل (Thread)
+    # تشغيل Flask في خيط مستقل
     t = Thread(target=run_flask)
+    t.daemon = True # لضمان إغلاق الخيط عند توقف البرنامج
     t.start()
     
-    # تشغيل بوت التليجرام
+    # تشغيل دورة البوت
     start_bot_loop()
