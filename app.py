@@ -51,62 +51,61 @@ AD_MESSAGE = """
 # 3. وظيفة عمل البوت (لكل حساب)
 # ==========================================
 async def run_worker(session_file):
-    """
-    هذه الدالة تأخذ اسم ملف الجلسة وتقوم بتشغيل البوت الخاص به
-    """
-    # استخراج اسم الجلسة بدون الامتداد .session
     session_name = os.path.splitext(session_file)[0]
     
     try:
-        # receive_updates=False ضروري جداً لتفادي أخطاء Render
+        # التعديل: تعطيل التحديثات تماماً
         client = TelegramClient(session_name, API_ID, API_HASH, receive_updates=False)
         
         print(f"🔌 جاري اتصال الحساب: {session_name}...")
         await client.start()
         
-        # جلب معلومات الحساب للتأكد
         me = await client.get_me()
         bot_name = me.first_name
         print(f"✅ تم دخول الحساب بنجاح: {bot_name}")
 
-        # حلقة العمل اللانهائية
         while True:
             try:
-                # 1. جلب المجموعات
                 groups = []
-                async for dialog in client.iter_dialogs():
-                    if dialog.is_group:
-                        groups.append(dialog)
+                # تعديل: محاولة جلب المجموعات مع تخطي أخطاء التنسيق (Constructor ID)
+                try:
+                    async for dialog in client.iter_dialogs(ignore_migrated=True):
+                        if dialog.is_group or dialog.is_channel:
+                            groups.append(dialog)
+                except Exception as e:
+                    print(f"⚠️ [{bot_name}] تنبيه أثناء قراءة المجموعات: {e}")
+                    # إذا فشل iter_dialogs، سيستمر البرنامج بما وجده أو يحاول لاحقاً
                 
-                print(f"📊 [{bot_name}] وجد {len(groups)} مجموعة. جاري البدء...")
+                if not groups:
+                    print(f"ℹ️ [{bot_name}] لم يتم العثور على مجموعات حالياً.")
+                    await asyncio.sleep(100)
+                    continue
+
+                print(f"📊 [{bot_name}] وجد {len(groups)} وجهة. جاري الإرسال...")
                 
-                # 2. تقسيم المجموعات (2 في كل مرة)
                 for i in range(0, len(groups), 2):
                     batch = groups[i:i+2]
-                    
                     for group in batch:
                         try:
-                            await client.send_message(group, AD_MESSAGE, parse_mode='html')
-                            print(f"✔️ [{bot_name}] أرسل لـ: {group.title}")
+                            # الإرسال باستخدام ID المجموعة مباشرة لتجنب أخطاء التنسيق
+                            await client.send_message(group.id, AD_MESSAGE, parse_mode='html')
+                            print(f"🚀 [{bot_name}] تم الإرسال -> {group.title}")
                         except Exception as e:
-                            print(f"⚠️ [{bot_name}] فشل في {group.title}: {e}")
-                            await asyncio.sleep(5) # انتظار بسيط عند الخطأ
+                            print(f"⚠️ [{bot_name}] تخطي {group.title}: {e}")
                     
-                    # 3. الانتظار العشوائي بين الدفعات (لمنع الحظر)
-                    wait = random.randint(60, 120)
+                    wait = random.randint(60, 90) # زيادة الوقت قليلاً للأمان
                     print(f"⏳ [{bot_name}] استراحة {wait} ثانية...")
                     await asyncio.sleep(wait)
                 
-                # 4. نهاية القائمة والانتظار الطويل
-                print(f"🏁 [{bot_name}] أنهى القائمة. سيعود بعد 10 دقائق...")
-                await asyncio.sleep(600)
+                print(f"🏁 [{bot_name}] أكمل الدورة. خمول لمدة 15 دقيقة...")
+                await asyncio.sleep(300)
 
             except Exception as e:
-                print(f"❌ خطأ عام في دورة [{bot_name}]: {e}")
-                await asyncio.sleep(60) # انتظار دقيقة قبل إعادة المحاولة
+                print(f"❌ خطأ في دورة [{bot_name}]: {e}")
+                await asyncio.sleep(60)
 
     except Exception as e:
-        print(f"🚫 فشل تشغيل ملف الجلسة {session_name}: {e}")
+        print(f"🚫 فشل نهائي في جلسة {session_name}: {e}")
 
 # ==========================================
 # 4. المشغل الرئيسي (Main)
