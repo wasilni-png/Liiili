@@ -1,5 +1,11 @@
 from telethon import TelegramClient, events
 import re
+from telethon.sessions import StringSession
+
+# اجلب النص من متغيرات البيئة في Render
+session_str = "1BJWap1sBu40j3ZH7Al9W21d4ghtN5RRH8mHEvqNj2MnWyhv1DVOLP86bxbf4BGk3bnuFeLCQVPKBvO2TRT8f5DWsTq-Qo8guDA0n2F6Zsb-dod4hEm3AeszVGzQp3JQmyk3HgmT2YB7hlMuA2ebcYO1jo_nRWu8Ib7ENq8XpjaTYtcrRhUfDgMBGg6ySQjhZWs4ICnAk79o3T9ICewTxZg6O2BlJMpP6kQThQRyWHGaytoadkvoL5tJcnrivDgsUSfY5r4IzrTE00RH9F7dTbuu9jeLqb2WKDZXcCM88_8gQGrB0etCtFZD7UnHydyQagi3i7pZZimgHOb_s8Xd7xPFjaP8Vuf4=" 
+
+
 
 # --- إعدادات الحساب ---
 # ضع بياناتك التي حصلت عليها من my.telegram.org هنا
@@ -7,7 +13,7 @@ api_id = 33888256  # استبدل هذا برقمك
 api_hash = 'bb1902689a7e203a7aedadb806c08854' # استبدل هذا بالكود الخاص بك
 
 # اسم الجلسة (سيتم إنشاء ملف بهذا الاسم لحفظ تسجيل الدخول)
-client = TelegramClient('my_userbot_session', api_id, api_hash)
+client = TelegramClient(StringSession(session_str), api_id, api_hash)
 
 # الكلمات المفتاحية التي نبحث عنها
 keywords = ['شهري', 'بالشهر', 'شهريا', 'شهرياً']
