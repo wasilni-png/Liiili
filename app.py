@@ -1,6 +1,8 @@
 from telethon import TelegramClient, events
 import re
 from telethon.sessions import StringSession
+from flask import Flask
+from threading import Thread
 
 # اجلب النص من متغيرات البيئة في Render
 session_str = "1BJWap1sBu40j3ZH7Al9W21d4ghtN5RRH8mHEvqNj2MnWyhv1DVOLP86bxbf4BGk3bnuFeLCQVPKBvO2TRT8f5DWsTq-Qo8guDA0n2F6Zsb-dod4hEm3AeszVGzQp3JQmyk3HgmT2YB7hlMuA2ebcYO1jo_nRWu8Ib7ENq8XpjaTYtcrRhUfDgMBGg6ySQjhZWs4ICnAk79o3T9ICewTxZg6O2BlJMpP6kQThQRyWHGaytoadkvoL5tJcnrivDgsUSfY5r4IzrTE00RH9F7dTbuu9jeLqb2WKDZXcCM88_8gQGrB0etCtFZD7UnHydyQagi3i7pZZimgHOb_s8Xd7xPFjaP8Vuf4=" 
@@ -72,6 +74,20 @@ async def my_event_handler(event):
 
         except Exception as e:
             print(f"حدث خطأ: {e}")
+
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "I am alive"
+
+def run():
+    app.run(host='0.0.0.0', port=8080)
+
+# تشغيل الخادم في خيط منفصل
+Thread(target=run).start()
+
+# هنا يكمل كود البوت الخاص بك (client.start...)
 
 # تشغيل البوت
 print("جاري تشغيل اليوزى بوت... يرجى الانتظار")
