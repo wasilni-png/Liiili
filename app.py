@@ -70,7 +70,7 @@ def normalize_arabic_text(text):
     return text
 
 # تهيئة العميل والمخزن
-client = TelegramClient(StringSession(SESSION_STR), API_ID, API_HASH)
+client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
 pending_orders = {zone: [] for zone in JEDDAH_ZONES.keys()}
 
 # ==========================================
