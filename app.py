@@ -50,7 +50,8 @@ JEDDAH_ZONES = {
 }
 
 # 4. الكلمات المفتاحية
-KEYWORDS = ['مشوار', 'توصيل', 'يوصلني', 'سواق', 'كابتن', 'سيارة', 'رايح', 'مطار', 'بكم']
+KEYWORDS = ['شهري', 'بالشهر', 'شهريا', 'عقد', 'دوام']
+
 
 # ==========================================
 # 🛠️ دالة تنظيف وتوحيد النصوص العربية
@@ -80,13 +81,13 @@ pending_orders = {zone: [] for zone in JEDDAH_ZONES.keys()}
 async def process_and_send_batch(zone):
     print(f"⏳ تجميع طلبات {zone} لمدة 5 دقائق...")
     await asyncio.sleep(300) 
-    
+
     if not pending_orders[zone]: return
 
     batch_msg = f"🔔 **حزمة طلبات جديدة | {zone}**\n"
     batch_msg += f"📦 العدد: {len(pending_orders[zone])} طلبات\n"
     batch_msg += "━━━━━━━━━━━━━━━━━━\n\n"
-    
+
     for i, order in enumerate(pending_orders[zone], 1):
         batch_msg += (
             f"{i}️⃣ **الحي:** {order['district']}\n"
@@ -95,7 +96,7 @@ async def process_and_send_batch(zone):
             f"🔗 [المصدر]({order['msg_url']})\n"
             "───────────────\n"
         )
-    
+
     batch_msg += "\n⚠️ تنسيقكم السريع يخدم الجميع."
 
     target_group_id = ZONE_GROUPS.get(zone)
@@ -106,13 +107,13 @@ async def process_and_send_batch(zone):
             await client.send_message('me', f"⚠️ لم يتم ضبط قروب {zone}:\n\n" + batch_msg)
     except Exception as e:
         print(f"❌ خطأ إرسال: {e}")
-    
+
     pending_orders[zone] = []
 
 @client.on(events.NewMessage)
 async def main_handler(event):
     if not event.is_group: return
-    
+
     raw_text = event.raw_text
     if not raw_text: return
 
@@ -139,7 +140,7 @@ async def main_handler(event):
             sender = await event.get_sender()
             sender_name = sender.first_name if sender else "عميل"
             user_link = f"tg://user?id={sender.id}" if sender else "#"
-            
+
             # بناء الرابط
             chat = await event.get_chat()
             chat_id = str(chat.id).replace("-100", "")
@@ -152,14 +153,14 @@ async def main_handler(event):
                 'text': raw_text[:120] + "...",
                 'msg_url': msg_url
             }
-            
+
             # بدء التجميع
             if len(pending_orders[detected_zone]) == 0:
                 pending_orders[detected_zone].append(new_order)
                 asyncio.create_task(process_and_send_batch(detected_zone))
             else:
                 pending_orders[detected_zone].append(new_order)
-                
+
             print(f"📥 التقاط طلب في {detected_district} (نطاق {detected_zone})")
         except Exception as e:
             print(f"❌ خطأ معالجة: {e}")
