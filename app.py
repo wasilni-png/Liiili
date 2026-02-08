@@ -116,18 +116,19 @@ async def process_and_send_batch(zone):
 
 @client.on(events.NewMessage)
 async def main_handler(event):
+    # 1. تجاهل الرسائل إذا لم تكن في مجموعة
     if not event.is_group: return
 
     raw_text = event.raw_text
     if not raw_text: return
 
-    # 🟢 تنظيف النص قبل المعالجة
+    # 2. تنظيف النص للبحث
     processed_text = normalize_arabic_text(raw_text)
 
     detected_zone = None
     detected_district = "غير محدد"
 
-    # البحث عن الحي
+    # 3. البحث عن الحي
     for zone, districts in JEDDAH_ZONES.items():
         for d in districts:
             if normalize_arabic_text(d) in processed_text:
@@ -136,48 +137,53 @@ async def main_handler(event):
                 break
         if detected_zone: break
 
-    # التأكد من وجود كلمة مفتاحية (شهرية)
+    # 4. التأكد من وجود الكلمات المفتاحية
     has_keyword = any(normalize_arabic_text(k) in processed_text for k in KEYWORDS)
 
+    # 5. إذا تطابقت الشروط (حي + كلمة مفتاحية)
     if detected_zone and has_keyword:
         try:
             sender = await event.get_sender()
-            sender_name = sender.first_name if sender else "عميل"
-            user_link = f"tg://user?id={sender.id}" if sender else "#"
+            sender_name = (sender.first_name if sender and sender.first_name else "عميل")
+            
+            # رابط التواصل معك (الموجه)
+            my_contact_link = "https://t.me/Servecestu"
 
-            # 🛠️ تعديل الرابط ليوجه إلى معرفك الشخصي بدلاً من الرسالة
-            msg_url = MY_CONTACT_LINK 
-
+            # تجهيز بيانات الطلب لنظام التجميع
             new_order = {
                 'district': detected_district,
                 'name': sender_name,
-                'link': user_link,
+                'link': my_contact_link, # جعلنا الرابط يوجه إليك حتى في الحزمة
                 'text': raw_text[:120] + "...",
-                'msg_url': msg_url
+                'msg_url': my_contact_link # توجيه المصدر إليك أيضاً
             }
 
-            # 🚀 إرسال الطلب فوراً إلى القروب العام المحدد
-                        # 🚀 إرسال الطلب فوراً إلى القروب العام المحدد (بدون رابط صاحب الطلب)
+            # 🔥 أولاً: الإرسال الفوري للقروب العام (بدون انتظار وبدون رابط العميل)
             immediate_msg = (
                 f"🆕 **طلب تعاقد جديد**\n"
                 f"📍 الحي: {detected_district}\n"
                 f"📝 الطلب: `{raw_text[:150]}...`\n"
                 f"👤 صاحب الطلب: {sender_name}\n\n"
-                f"📞 [للتنسيق والحجز اضغط هنا]({MY_CONTACT_LINK})"
+                f"📞 [للتنسيق والحجز اضغط هنا]({my_contact_link})"
             )
-            await client.send_message(PUBLIC_GROUP_ID, immediate_msg, link_preview=False)
+            
+            try:
+                # تأكد من أن المعرف يبدأ بـ -100
+                public_target = -1003410176303
+                await client.send_message(public_target, immediate_msg, link_preview=False)
+                print(f"✅ تم الإرسال الفوري للقروب العام: {detected_district}")
+            except Exception as send_err:
+                print(f"⚠️ فشل الإرسال الفوري: {send_err}")
 
-            # 📥 إضافة الطلب إلى قائمة التجميع (Batching) لإرساله للمجموعات الفرعية لاحقاً
+            # 📥 ثانياً: إضافة الطلب لنظام التجميع (الـ 5 دقائق) للمجموعات الأخرى
             if len(pending_orders[detected_zone]) == 0:
                 pending_orders[detected_zone].append(new_order)
                 asyncio.create_task(process_and_send_batch(detected_zone))
             else:
                 pending_orders[detected_zone].append(new_order)
 
-            print(f"📥 التقاط وإرسال فوري لطلب في {detected_district}")
-            
         except Exception as e:
-            print(f"❌ خطأ معالجة: {e}")
+            print(f"❌ خطأ داخلي في المعالجة: {e}")
 
 # ==========================================
 # 🌐 الخادم والتشغيل
