@@ -51,7 +51,9 @@ JEDDAH_ZONES = {
 # 4. الكلمات المفتاحية
 KEYWORDS = ['شهري', 'بالشهر', 'شهريا', 'عقد', 'دوام']
 
-
+# 5. معرفات إضافية
+PUBLIC_GROUP_ID = -1003410176303  # تم إضافة -100 لأنها مجموعة خارقة
+MY_CONTACT_LINK = "https://t.me/Servecestu"  # رابط معرفك الشخصي
 # ==========================================
 # 🛠️ دالة تنظيف وتوحيد النصوص العربية
 # ==========================================
@@ -109,6 +111,9 @@ async def process_and_send_batch(zone):
 
     pending_orders[zone] = []
 
+
+
+
 @client.on(events.NewMessage)
 async def main_handler(event):
     if not event.is_group: return
@@ -131,7 +136,7 @@ async def main_handler(event):
                 break
         if detected_zone: break
 
-    # التأكد من وجود كلمة مفتاحية
+    # التأكد من وجود كلمة مفتاحية (شهرية)
     has_keyword = any(normalize_arabic_text(k) in processed_text for k in KEYWORDS)
 
     if detected_zone and has_keyword:
@@ -140,10 +145,8 @@ async def main_handler(event):
             sender_name = sender.first_name if sender else "عميل"
             user_link = f"tg://user?id={sender.id}" if sender else "#"
 
-            # بناء الرابط
-            chat = await event.get_chat()
-            chat_id = str(chat.id).replace("-100", "")
-            msg_url = f"https://t.me/c/{chat_id}/{event.message.id}"
+            # 🛠️ تعديل الرابط ليوجه إلى معرفك الشخصي بدلاً من الرسالة
+            msg_url = MY_CONTACT_LINK 
 
             new_order = {
                 'district': detected_district,
@@ -153,14 +156,26 @@ async def main_handler(event):
                 'msg_url': msg_url
             }
 
-            # بدء التجميع
+            # 🚀 إرسال الطلب فوراً إلى القروب العام المحدد
+                        # 🚀 إرسال الطلب فوراً إلى القروب العام المحدد (بدون رابط صاحب الطلب)
+            immediate_msg = (
+                f"🆕 **طلب تعاقد جديد**\n"
+                f"📍 الحي: {detected_district}\n"
+                f"📝 الطلب: `{raw_text[:150]}...`\n"
+                f"👤 صاحب الطلب: {sender_name}\n\n"
+                f"📞 [للتنسيق والحجز اضغط هنا]({MY_CONTACT_LINK})"
+            )
+            await client.send_message(PUBLIC_GROUP_ID, immediate_msg, link_preview=False)
+
+            # 📥 إضافة الطلب إلى قائمة التجميع (Batching) لإرساله للمجموعات الفرعية لاحقاً
             if len(pending_orders[detected_zone]) == 0:
                 pending_orders[detected_zone].append(new_order)
                 asyncio.create_task(process_and_send_batch(detected_zone))
             else:
                 pending_orders[detected_zone].append(new_order)
 
-            print(f"📥 التقاط طلب في {detected_district} (نطاق {detected_zone})")
+            print(f"📥 التقاط وإرسال فوري لطلب في {detected_district}")
+            
         except Exception as e:
             print(f"❌ خطأ معالجة: {e}")
 
