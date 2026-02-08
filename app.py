@@ -1,4 +1,4 @@
-import re
+Import re
 import os
 import asyncio
 from threading import Thread
@@ -51,9 +51,7 @@ JEDDAH_ZONES = {
 # 4. الكلمات المفتاحية
 KEYWORDS = ['شهري', 'بالشهر', 'شهريا', 'عقد', 'دوام']
 
-# 5. معرفات إضافية
-PUBLIC_GROUP_ID = -1003410176303  # تم إضافة -100 لأنها مجموعة خارقة
-MY_CONTACT_LINK = "https://t.me/Servecestu"  # رابط معرفك الشخصي
+
 # ==========================================
 # 🛠️ دالة تنظيف وتوحيد النصوص العربية
 # ==========================================
@@ -111,24 +109,20 @@ async def process_and_send_batch(zone):
 
     pending_orders[zone] = []
 
-
-
-
 @client.on(events.NewMessage)
 async def main_handler(event):
-    # 1. تجاهل الرسائل إذا لم تكن في مجموعة
     if not event.is_group: return
 
     raw_text = event.raw_text
     if not raw_text: return
 
-    # 2. تنظيف النص للبحث
+    # 🟢 تنظيف النص قبل المعالجة
     processed_text = normalize_arabic_text(raw_text)
 
     detected_zone = None
     detected_district = "غير محدد"
 
-    # 3. البحث عن الحي
+    # البحث عن الحي
     for zone, districts in JEDDAH_ZONES.items():
         for d in districts:
             if normalize_arabic_text(d) in processed_text:
@@ -137,53 +131,38 @@ async def main_handler(event):
                 break
         if detected_zone: break
 
-    # 4. التأكد من وجود الكلمات المفتاحية
+    # التأكد من وجود كلمة مفتاحية
     has_keyword = any(normalize_arabic_text(k) in processed_text for k in KEYWORDS)
 
-    # 5. إذا تطابقت الشروط (حي + كلمة مفتاحية)
     if detected_zone and has_keyword:
         try:
             sender = await event.get_sender()
-            sender_name = (sender.first_name if sender and sender.first_name else "عميل")
-            
-            # رابط التواصل معك (الموجه)
-            my_contact_link = "https://t.me/Servecestu"
+            sender_name = sender.first_name if sender else "عميل"
+            user_link = f"tg://user?id={sender.id}" if sender else "#"
 
-            # تجهيز بيانات الطلب لنظام التجميع
+            # بناء الرابط
+            chat = await event.get_chat()
+            chat_id = str(chat.id).replace("-100", "")
+            msg_url = f"https://t.me/c/{chat_id}/{event.message.id}"
+
             new_order = {
                 'district': detected_district,
                 'name': sender_name,
-                'link': my_contact_link, # جعلنا الرابط يوجه إليك حتى في الحزمة
+                'link': user_link,
                 'text': raw_text[:120] + "...",
-                'msg_url': my_contact_link # توجيه المصدر إليك أيضاً
+                'msg_url': msg_url
             }
 
-            # 🔥 أولاً: الإرسال الفوري للقروب العام (بدون انتظار وبدون رابط العميل)
-            immediate_msg = (
-                f"🆕 **طلب تعاقد جديد**\n"
-                f"📍 الحي: {detected_district}\n"
-                f"📝 الطلب: `{raw_text[:150]}...`\n"
-                f"👤 صاحب الطلب: {sender_name}\n\n"
-                f"📞 [للتنسيق والحجز اضغط هنا]({my_contact_link})"
-            )
-            
-            try:
-                # تأكد من أن المعرف يبدأ بـ -100
-                public_target = -1003410176303
-                await client.send_message(public_target, immediate_msg, link_preview=False)
-                print(f"✅ تم الإرسال الفوري للقروب العام: {detected_district}")
-            except Exception as send_err:
-                print(f"⚠️ فشل الإرسال الفوري: {send_err}")
-
-            # 📥 ثانياً: إضافة الطلب لنظام التجميع (الـ 5 دقائق) للمجموعات الأخرى
+            # بدء التجميع
             if len(pending_orders[detected_zone]) == 0:
                 pending_orders[detected_zone].append(new_order)
                 asyncio.create_task(process_and_send_batch(detected_zone))
             else:
                 pending_orders[detected_zone].append(new_order)
 
+            print(f"📥 التقاط طلب في {detected_district} (نطاق {detected_zone})")
         except Exception as e:
-            print(f"❌ خطأ داخلي في المعالجة: {e}")
+            print(f"❌ خطأ معالجة: {e}")
 
 # ==========================================
 # 🌐 الخادم والتشغيل
