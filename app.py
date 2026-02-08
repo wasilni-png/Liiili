@@ -13,9 +13,7 @@ from telethon.sessions import StringSession
 
 API_ID = os.environ.get("API_ID", 33888256)
 API_HASH = os.environ.get("API_HASH", 'bb1902689a7e203a7aedadb806c08854')
-SESSION_STRING = os.environ.get("SESSION_STRING", "1BJWap1sBu40j3ZH7Al9W21d4ghtN5RRH8mHEvqNj2MnWyhv1DVOLP86bxbf4BGk3bnuFeLCQVPKBvO2TRT8f5DWsTq-Qo8guDA0n2F6Zsb-dod4hEm3AeszVGzQp3JQmyk3HgmT2YB7hlMuA2ebcYO1jo_nRWu8Ib7ENq8XpjaTYtcrRhUfDgMBGg6ySQjhZWs4ICnAk79o3T9ICewTxZg6O2BlJMpP6kQThQRyWHGaytoadkvoL5tJcnrivDgsUSfY5r4IzrTE00RH9F7dTbuu9jeLqb2WKDZXcCM88_8gQGrB0etCtFZD7UnHydyQagi3i7pZZimgHOb_s8Xd7xPFjaP8Vuf4=")
-
-# تم إزالة PUBLIC_GROUP_ID من هنا
+SESSION_STRING = os.environ.get("SESSION_STRING", "YOUR_SESSION_HERE")
 
 ZONE_GROUPS = {
     'شمال جدة': -1003760776543, 
@@ -26,10 +24,8 @@ ZONE_GROUPS = {
 
 KEYWORDS = ['شهري', 'بالشهر', 'شهريا', 'عقد', 'دوام', 'مشوار ثبات']
 
-# ==========================================
-# 📍 قاعدة البيانات الجغرافية
-# ==========================================
-
+# (قاعدة البيانات الجغرافية DISTRICT_COORDS و JEDDAH_ZONES تبقى كما هي في كودك الأصلي)
+# ... [توضع هنا مصفوفات الأحياء والإحداثيات] ...
 JEDDAH_ZONES = {
     'شمال جدة': [
         'أبحر الشمالية', 'أبحر الجنوبية', 'الحمدانية', 'المرجان', 'البساتين', 'النعيم', 
@@ -111,7 +107,7 @@ DISTRICT_COORDS = {
 
 
 # ==========================================
-# 🛠️ الدوال المساعدة
+# 🛠️ المحرك الذكي (Intelligence Engine)
 # ==========================================
 
 def normalize_arabic_text(text):
@@ -123,6 +119,15 @@ def normalize_arabic_text(text):
     text = re.sub(tashkeel, '', text)
     text = re.sub(r'http\S+|www\S+|@\S+', '', text)
     return text
+
+def extract_smart_details(text):
+    """استخراج السعر وعدد الركاب من النص"""
+    price_match = re.search(r'(\d{3,4})\s?(ريال|ر|السعر)', text)
+    passengers_match = re.search(r'(عدد|احنا|ركاب)\s?(\d)', text)
+    
+    price = price_match.group(1) if price_match else "بالاتفاق"
+    passengers = passengers_match.group(2) if passengers_match else "1"
+    return price, passengers
 
 def calculate_distance(origin_name, dest_name):
     coords1 = DISTRICT_COORDS.get(origin_name)
@@ -142,7 +147,7 @@ def calculate_distance(origin_name, dest_name):
     return actual_dist, est_time
 
 # ==========================================
-# 🧠 منطق المعالجة الأساسي
+# 🧠 منطق المعالجة المطور
 # ==========================================
 
 client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
@@ -155,44 +160,38 @@ async def main_handler(event):
     if not raw_text: return
 
     processed_text = normalize_arabic_text(raw_text)
-    has_keyword = any(normalize_arabic_text(k) in processed_text for k in KEYWORDS)
-    if not has_keyword: return
+    if not any(normalize_arabic_text(k) in processed_text for k in KEYWORDS): return
 
     origin, dest, found_zone = "غير محدد", "غير محدد", None
 
+    # تحليل المواقع
     for zone, districts in JEDDAH_ZONES.items():
         for d in districts:
             norm_d = normalize_arabic_text(d)
             if norm_d in processed_text:
-                if ' من ' + norm_d in processed_text:
-                    origin, found_zone = d, zone
-                elif ' الى ' + norm_d in processed_text or ' لحي ' + norm_d in processed_text:
-                    dest = d
+                if ' من ' + norm_d in processed_text: origin, found_zone = d, zone
+                elif ' الى ' + norm_d in processed_text or ' لحي ' + norm_d in processed_text: dest = d
                 else:
                     if origin == "غير محدد": origin, found_zone = d, zone
 
     if found_zone:
         try:
             dist, time = calculate_distance(origin, dest)
+            price, passengers = extract_smart_details(raw_text)
             sender = await event.get_sender()
-            sender_name = sender.first_name if sender else "عميل"
             
-            # روابط التواصل والمصدر
-            user_link = f"tg://user?id={sender.id}" if sender else "#"
             chat = await event.get_chat()
             chat_id = str(chat.id).replace("-100", "")
             msg_url = f"https://t.me/c/{chat_id}/{event.message.id}"
 
-            time_m = re.search(r'الساعه\s?(\d+)', raw_text)
-            req_time = time_m.group(0) if time_m else "غير محدد"
-
             new_order = {
                 'origin': origin, 'dest': dest, 'dist': dist, 'time': time,
-                'req_time': req_time, 'name': sender_name, 'text': raw_text[:120],
-                'link': user_link, 'msg_url': msg_url
+                'price': price, 'passengers': passengers,
+                'name': sender.first_name if sender else "عميل",
+                'link': f"tg://user?id={sender.id}" if sender else "#",
+                'msg_url': msg_url,
+                'raw': raw_text[:100]
             }
-
-            # تم حذف جزء الإرسال الفوري للقروب العام من هنا ❌
 
             if not pending_orders[found_zone]:
                 pending_orders[found_zone].append(new_order)
@@ -200,40 +199,47 @@ async def main_handler(event):
             else:
                 pending_orders[found_zone].append(new_order)
                 
-            print(f"📥 التقاط طلب في {origin} (نطاق {found_zone})")
         except Exception as e:
-            print(f"❌ خطأ معالجة: {e}")
+            print(f"❌ Error: {e}")
 
 async def process_and_send_batch(zone):
-    await asyncio.sleep(300) # تجميع لمدة 5 دقائق
-    if not pending_orders[zone]: return
+    await asyncio.sleep(3000)  # زيادة الوقت لـ 10 دقائق لضمان التوافق
+    
+    orders = pending_orders[zone]
+    if not orders: return
+    pending_orders[zone] = []
 
     batch_msg = f"🚚 **حزمة المسارات الذكية | {zone}**\n"
     batch_msg += "━━━━━━━━━━━━━━━━━━\n\n"
 
+    # تصنيف ذكي: تجميع المشاوير التي لها نفس الوجهة أو وجهات قريبة
     clusters = {}
-    for o in pending_orders[zone]:
+    for o in orders:
         clusters.setdefault(o['dest'], []).append(o)
 
-    for d_name, orders in clusters.items():
-        batch_msg += f"🚩 **الوجهة: {d_name}**\n"
-        for o in orders:
+    for d_name, group in clusters.items():
+        batch_msg += f"📍 **الوجهة النهائية: {d_name}**\n"
+        
+        # إذا وجدنا أكثر من طلب لنفس الوجهة نضع علامة "توافق"
+        if len(group) > 1:
+            batch_msg += "✨ *يوجد توافق عالي لهذا المسار للسائقين*\n"
+            
+        for o in group:
             batch_msg += (
-                f"🔹 من: `{o['origin']}` | 🕒 `{o['req_time']}`\n"
-                f"👤 **العميل:** [{o['name']}]({o['link']})\n"
-                f"📏 `~{o['dist']} كم` | ⏳ `~{o['time']} د`\n"
-                f"🔗 [رابط المصدر (الرسالة الأصلية)]({o['msg_url']})\n"
+                f"🔸 من: `{o['origin']}`\n"
+                f"💰 السعر: `{o['price']}` | 👥 ركاب: `{o['passengers']}`\n"
+                f"👤 العميل: [{o['name']}]({o['link']})\n"
+                f"📏 المسافة: `~{o['dist']} كم` | [المصدر]({o['msg_url']})\n"
                 f"⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n"
             )
     
-    batch_msg += f"\n⚠️ التنسيق السريع يخدم الجميع."
+    batch_msg += f"\n✅ تم تجميع {len(orders)} طلبات متوافقة."
     
-    target_group_id = ZONE_GROUPS.get(zone)
-    if target_group_id:
-        await client.send_message(target_group_id, batch_msg, link_preview=False)
-    
-    pending_orders[zone] = []
+    target = ZONE_GROUPS.get(zone)
+    if target:
+        await client.send_message(target, batch_msg, link_preview=False)
 
+# ... [Flask و Thread تشغيل السيرفر تبقى كما هي] ...
 # ==========================================
 # 🌐 تشغيل السيرفر
 # ==========================================
