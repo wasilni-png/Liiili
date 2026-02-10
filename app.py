@@ -235,7 +235,7 @@ async def notify_channel(detected_district, original_msg):
 
         buttons = [
             [InlineKeyboardButton("💬 مراسلة العميل (للمشتركين)", url=gate_contact)],
-            [InlineKeyboardButton("💳 للاشتراك وتفعيل الحساب", url="https://t.me/x3FreTx")]
+            [InlineKeyboardButton("💳 للاشتراك وتفعيل الحساب", url="https://t.me/Servecestu")]
         ]
 
         keyboard = InlineKeyboardMarkup(buttons)
