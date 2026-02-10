@@ -29,7 +29,7 @@ logging.basicConfig(level=logging.WARNING)
 # متغيرات البيئة (تأكد من تعبئتها في الاستضافة)
 API_ID = os.environ.get("API_ID", "36360458")
 API_HASH = os.environ.get("API_HASH", "daae4628b4b4aac1f0ebfce23c4fa272")
-SESSION_STRING = os.environ.get("SESSION_STRING", "1BJWap1sBu40j3ZH7Al9W21d4ghtN5RRH8mHEvqNj2MnWyhv1DVOLP86bxbf4BGk3bnuFeLCQVPKBvO2TRT8f5DWsTq-Qo8guDA0n2F6Zsb-dod4hEm3AeszVGzQp3JQmyk3HgmT2YB7hlMuA2ebcYO1jo_nRWu8Ib7ENq8XpjaTYtcrRhUfDgMBGg6ySQjhZWs4ICnAk79o3T9ICewTxZg6O2BlJMpP6kQThQRyWHGaytoadkvoL5tJcnrivDgsUSfY5r4IzrTE00RH9F7dTbuu9jeLqb2WKDZXcCM88_8gQGrB0etCtFZD7UnHydyQagi3i7pZZimgHOb_s8Xd7xPFjaP8Vuf4=")
+SESSION_STRING = os.environ.get("SESSION_STRING", "BAIq0QoAOD9QpM8asjl1fICVx0vTRH7QjtgTNCEF692Ihz9Xkj_HWnZ6hnl3pv8gN6yFWqMEBhFl7A40uQWQWIsU8KM9or6K-_HsGbe8SP_4AhbIIFU7vrqyo_tuU0SydmvpT8sbSs-RC-yl89Gm5t4EXag2g9Wxr_MQaWIYtJZGWWkVisaDjM8AnUbfD9BDzolvp06qEz-mnsrKZCQKmrPmA_LNhxpqBBcdEJ9EVs4Lwvsh0B7u_ZyOtLhetuwb1YAd1pYNYd00OGwlLuH-8tJc5v5cFbeX6bxT89JMEZVELD2aKhU1XeljAxSieD0F3yL9TsLFglGwu-qsSs7b_073w9e9ZAAAAAH-ZrzOAA")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyDtF2lEZuEvI1hTFFrPRbGwwvj7ZocdPjs")
 
 # إعدادات المستخدمين والقنوات
