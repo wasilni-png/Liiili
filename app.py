@@ -99,55 +99,41 @@ IRRELEVANT_TOPICS = [
 # ---------------------------------------------------------
 # 2. المحرك الهجين (Hybrid Engine)
 # ---------------------------------------------------------
+# ---------------------------------------------------------
+# 2. المحرك الهجين (Hybrid Engine) - النسخة المخصصة لجدة
+# ---------------------------------------------------------
 async def analyze_message_hybrid(text):
     if not text or len(text) < 5 or len(text) > 400: return False
 
     clean_text = normalize_text(text)
-    route_pattern = r"(^|\s)من\s+.*?\s+(إلى|الى|لـ|للحرم|للمطار)(\s|$)"
+    # تحديث نمط المسارات ليشمل معالم جدة الشهيرة (المطار، الكورنيش، الميناء)
+    route_pattern = r"(^|\s)من\s+.*?\s+(إلى|الى|لـ|للمطار|للكورنيش|للواجهة|للميناء)(\s|$)"
     if re.search(route_pattern, clean_text):
         return True 
 
     if any(k in clean_text for k in BLOCK_KEYWORDS): return False
     if any(k in clean_text for k in IRRELEVANT_TOPICS): return False
 
-        # البرومبت الشامل (The Master Prompt)
+    # البرومبت الشامل المحدث لمدينة جدة
     prompt = f"""
-    Role: You are an elite AI Traffic Controller for a specific 'Madinah Taxi & Delivery' Telegram group.
-    Objective: Filter messages to identify REAL CUSTOMERS seeking services (Rides, Delivery, School Transport).
+    Role: You are an elite AI Traffic Controller for a 'Jeddah Taxi & Delivery' Telegram group.
+    Objective: Filter messages to identify REAL CUSTOMERS seeking services in Jeddah.
     
     [STRICT ANALYSIS RULES]
-    You must classify the "Intent" of the sender.
-    - SENDER = CUSTOMER (Needs service) -> Reply 'YES'
-    - SENDER = DRIVER (Offers service) -> Reply 'NO'
-    - SENDER = SPAM/CHATTER -> Reply 'NO'
+    Identify if the SENDER is a CUSTOMER needing a ride or delivery in Jeddah.
 
-    [✅ CLASSIFY AS 'YES' (CUSTOMER REQUESTS)]
-    1. Explicit Ride Requests: (e.g., "أبغى سواق", "مطلوب كابتن", "سيارة للحرم", "مين يوديني؟").
-    2. Route Descriptions (Implicit): Text mentioning a destination or path (e.g., "من العزيزية للحرم", "مشوار للمطار", "إلى الراشد مول").
-    3. Location Pings (Incomplete Requests): If someone just names a location implies they need a driver there (e.g., "حي شوران؟", "أحد حول العالية؟", "في كباتن في الهجرة؟").
-    4. School & Monthly Contracts: (e.g., "توصيل مدارس", "نقل طالبات", "عقد شهري", "توصيل دوام").
-    5. Delivery & Logistics: Requests to move items (e.g., "توصيل غرض", "توصيل مفتاح", "طلبية من زاجل", "توصيل أكل").
-    6. Price Inquiries by Customer: (e.g., "بكم المشوار للمطار؟", "توديني بـ 20؟").
+    [✅ CLASSIFY AS 'YES' (JEDDAH CUSTOMER REQUESTS)]
+    1. Explicit Ride Requests: (e.g., "أبغى سواق بجدة", "مطلوب كابتن", "سيارة للمطار", "مين يوديني الكورنيش؟").
+    2. Route Descriptions: Mentioning Jeddah areas (e.g., "من السامر للتحلية", "مشوار من أبحر للبلد", "إلى رد سي مول").
+    3. Location Pings: (e.g., "أحد حول حي المنار؟", "في كباتن في الحمدانية؟", "حي السلامة؟").
+    4. Delivery: (e.g., "توصيل غرض من المطار", "مندوب لحي الصفا").
 
-    [❌ CLASSIFY AS 'NO' (IGNORE THESE)]
-    1. Driver Offers (Supply): Any text indicating the sender IS a driver (e.g., "متواجد", "جاهز للتوصيل", "سيارة حديثة", "توصيل مشاوير", "على مدار الساعة", "الخاص مفتوح").
-    2. Social & Religious: Greetings, prayers, wisdom (e.g., "صباح الخير", "جمعة مباركة", "سبحان الله", "دعاء", "حكم").
-    3. Forbidden Spam Topics: 
-       - Medical Excuses (e.g., "سكليف", "عذر طبي", "اجازة مرضية").
-       - Marriage/Social (e.g., "خطابة", "زواج مسيار", "تعارف").
-       - Financial/Real Estate (e.g., "قروض", "أرض للبيع", "استثمار").
-    4. General Chat/Admin: Questions about rules, links, or weather.
+    [❌ CLASSIFY AS 'NO']
+    Ignore Driver offers ("شغال الآن", "سيارة نظيفة") or Spams.
 
-    [📍 MADINAH CONTEXT KNOWLEDGE]
-    Treat these as valid locations implying a request if mentioned alone:
-    (Haram, Airport, Train Station, Aziziya, Shoran, Awali, Hijra, Baqdo, Quba, Sultana, Rashid Mall, Al-Noor, Taiba).
-
-    [DECISION LOGIC]
-    - "From A to B" -> YES
-    - "I am available" -> NO
-    - "School delivery needed" -> YES
-    - "Sick leave for sale" -> NO
-    - "Who is in Shoran?" -> YES
+    [📍 JEDDAH CONTEXT KNOWLEDGE]
+    Valid Jeddah locations: 
+    (Al-Safa, Al-Samer, Al-Hamdania, Obhur, Al-Rawdah, Al-Salama, Al-Zahra, Al-Balad, Al-Baghdadia, Al-Rehab, Al-Marwah, Red Sea Mall, Jeddah Park, Airport T1).
 
     Input Text: "{text}"
 
@@ -159,8 +145,11 @@ async def analyze_message_hybrid(text):
         result = response.text.strip().upper().replace(".", "")
         return "YES" in result
     except Exception as e:
-        print(f"⚠️ تجاوز AI (فشل الاتصال): {e}")
+        print(f"⚠️ تجاوز AI: {e}")
         return manual_fallback_check(clean_text)
+
+
+        # ... (إرسال للقناة) ...
 
 def manual_fallback_check(clean_text):
     order_words = ["ابي", "ابغي", "محتاج", "نبي", "مطلوب", "بكم"]
