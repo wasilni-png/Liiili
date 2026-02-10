@@ -187,16 +187,15 @@ async def notify_users(detected_district, original_msg):
         # زر المصدر
        
 
-                # زر المصدر
         keyboard = InlineKeyboardMarkup(buttons_list)
 
         alert_text = (
             f"🎯 <b>طلب جديد تم التقاطه!</b>\n\n"
             f"📍 <b>المنطقة:</b> {detected_district}\n"
             f"👤 <b>اسم العميل:</b> {customer.first_name if customer else 'مخفي'}\n"
-            f"📝 <b>نص الطلب:</b>\n<i>{content}</i>"
+            f"📝 <b>نص الطلب:</b>\n<i>{content}</i>\n\n"
+            f"⏰ <b>الوقت:</b> {datetime.now().strftime('%H:%M:%S')}"
         )
-
 
         # 4. التكرار لإرسال الرسالة لكل شخص في القائمة TARGET_USERS
         for user_id in TARGET_USERS:
