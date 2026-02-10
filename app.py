@@ -191,37 +191,42 @@ async def analyze_message_hybrid(text):
     if any(k in clean_text for k in IRRELEVANT_TOPICS): return False
 
     # البرومبت الشامل (Master Prompt)
+        # برومبت متخصص لخدمات التوصيل في مدينة جدة
     prompt = f"""
-    Role: You are an elite AI Traffic Controller.
-    Objective: Filter messages to identify REAL CUSTOMERS seeking services (Rides, Delivery, School Transport).
+    Role: You are an elite AI Traffic Controller specialized in Jeddah City geography and taxi market.
+    Objective: Filter messages to identify REAL CUSTOMERS in Jeddah seeking rides, school transport, or logistics.
     
     [STRICT ANALYSIS RULES]
     - SENDER = CUSTOMER (Needs service) -> Reply 'YES'
     - SENDER = DRIVER (Offers service) -> Reply 'NO'
-    - SENDER = SPAM/CHATTER -> Reply 'NO'
+    - SENDER = SPAM/ADVERTISEMENT -> Reply 'NO'
 
-    [✅ CLASSIFY AS 'YES' (CUSTOMER REQUESTS)]
-    1. Explicit Ride Requests: (e.g., "أبغى سواق", "مطلوب كابتن", "سيارة للحرم").
-    2. Route Descriptions: (e.g., "من العزيزية للحرم", "إلى الراشد مول").
-    3. Location Pings: (e.g., "حي شوران؟", "أحد حول العالية؟").
-    4. School/Work/Monthly: (e.g., "توصيل مدارس", "نقل طالبات", "عقد شهري", "دوام").
-    5. Delivery: (e.g., "توصيل غرض", "توصيل مفتاح").
-    6. Price Inquiries: (e.g., "بكم المشوار للمطار؟").
+    [✅ CLASSIFY AS 'YES' (JEDDAH CUSTOMER REQUESTS)]
+    1. Ride Needs: (e.g., "أبغى سيارة للمطار", "كابتن مشوار لأبحر", "توصيل للبلد").
+    2. Jeddah Routes: Text mentioning Jeddah paths (e.g., "من السامر للتحلية", "من الحمدانية للرويس", "إلى واجهة جدة البحرية").
+    3. Airport & Train: (e.g., "توصيل مطار الملك عبدالعزيز", "مشوار لمحطة قطار السليمانية").
+    4. School & Daily Commute: Very common in Jeddah (e.g., "توصيل طالبات لجامعة الملك عبدالعزيز", "نقل موظفات لحي الشاطئ", "عقد شهري دوام").
+    5. Specific Jeddah Landmarks: Mentioning places like (Red Sea Mall, Al-Balad, Tahlia Street, Obhur, Corniche, Serafi Mega Mall).
+    6. Delivery: (e.g., "توصيل غرض من شرق جدة لغربها").
 
     [❌ CLASSIFY AS 'NO' (IGNORE THESE)]
-    1. Driver Offers: (e.g., "متواجد", "جاهز", "سيارة حديثة").
-    2. Spam Topics: (Medical excuses, Marriage/Misyar, Loans, Real Estate).
-    3. General Chat: Greetings or admin messages.
+    1. Jeddah Driver Ads: (e.g., "سواق خاص بجدة متاح", "توصيل مشاوير بسيارة نظيفة", "كابتن جاهز بجدة").
+    2. Non-Logistics Topics: (Medical excuses/Sick leaves, Marriage/Misyar, Real Estate, Loans).
+    3. General Chat: (e.g., "كيف زحمة طريق الحرمين؟", "صباح الخير يا أهل جدة").
+
+    [📍 JEDDAH GEOGRAPHIC CONTEXT]
+    Recognize these districts: (Hamdaniya, Obhur, Samer, Safa, Rawdah, Salamah, Zahra, Naeem, Aziziyah, Faihaa, Gawhara, Sanabel).
 
     [DECISION LOGIC]
-    - "From A to B" -> YES
-    - "I am available" -> NO
-    - "School delivery needed" -> YES
-    - "Sick leave for sale" -> NO
+    - "من حي السامر إلى المطار" -> YES
+    - "أنا كابتن متواجد في أبحر" -> NO
+    - "مطلوب باص لتوصيل مدارس في الحمدانية" -> YES
+    - "استثمار عقاري في جدة" -> NO
 
     Input Text: "{text}"
     FINAL ANSWER (Reply ONLY with 'YES' or 'NO'):
     """
+
 
     try:
         response = await asyncio.to_thread(ai_model.generate_content, prompt)
