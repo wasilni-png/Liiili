@@ -178,11 +178,15 @@ async def notify_users(detected_district, original_msg):
         # ملاحظة: الروابط المباشرة للجروبات الخاصة تتطلب أن يكون المستخدم منضماً للجروب
         
         # 3. تجهيز الأزرار
-        buttons_list = []
+                # اسم يوزر البوت الخاص بك (بدون @)
+        bot_username = "Mishweribot" 
+        
+        # إنشاء رابط وسيط يحتوي على آيدي العميل
+        gateway_url = f"https://t.me/{bot_username}?start=chat_{customer.id}"
 
-        # زر مراسلة العميل (يظهر فقط إذا توفر الرابط)
-        if direct_contact_url:
-            buttons_list.append([InlineKeyboardButton("💬 مراسلة العميل مباشرة", url=direct_contact_url)])
+        buttons_list = [
+            [InlineKeyboardButton("💬 مراسلة العميل (عبر البوت)", url=gateway_url)],
+        ]
 
         # زر المصدر
        
