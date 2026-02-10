@@ -26,8 +26,8 @@ except Exception as e:
     sys.exit(1)
 
 # --- متغيرات البيئة ---
-API_ID = os.environ.get("API_ID", "36360458")
-API_HASH = os.environ.get("API_HASH", "daae4628b4b4aac1f0ebfce23c4fa272")
+API_ID = os.environ.get("API_ID", "33888256")
+API_HASH = os.environ.get("API_HASH", "bb1902689a7e203a7aedadb806c08854")
 SESSION_STRING = os.environ.get("SESSION_STRING", "BAIq0QoAOD9QpM8asjl1fICVx0vTRH7QjtgTNCEF692Ihz9Xkj_HWnZ6hnl3pv8gN6yFWqMEBhFl7A40uQWQWIsU8KM9or6K-_HsGbe8SP_4AhbIIFU7vrqyo_tuU0SydmvpT8sbSs-RC-yl89Gm5t4EXag2g9Wxr_MQaWIYtJZGWWkVisaDjM8AnUbfD9BDzolvp06qEz-mnsrKZCQKmrPmA_LNhxpqBBcdEJ9EVs4Lwvsh0B7u_ZyOtLhetuwb1YAd1pYNYd00OGwlLuH-8tJc5v5cFbeX6bxT89JMEZVELD2aKhU1XeljAxSieD0F3yL9TsLFglGwu-qsSs7b_073w9e9ZAAAAAH-ZrzOAA")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyDtF2lEZuEvI1hTFFrPRbGwwvj7ZocdPjs")
 
@@ -36,13 +36,13 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyDtF2lEZuEvI1hTFFrPRbGww
 # ضع الـ IDs الخاصة بهم هنا (أرقام فقط)
 # ---------------------------------------------------------
 # 🛠️ قائمة الـ IDs المحدثة الذين سيستلمون الطلبات في الخاص (مفتوحة)
-TARGET_USERS = [
-    7996171713, 7513630480
-]
 
 CHANNEL_ID = -1003843717541 
  # <--- ضع الآيديات الحقيقية هنا
 
+TARGET_USERS = [
+    7996171713, 7513630480
+]
 
 
 # --- إعداد Gemini 1.5 Flash ---
