@@ -1,59 +1,49 @@
-import re
-import os
 import asyncio
+import threading
+import sys
+import os
+import logging
+import re
 import math
-from threading import Thread
 from flask import Flask
-from telethon import TelegramClient, events
-from telethon.sessions import StringSession
+from pyrogram import Client
+from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.constants import ParseMode
+import google.generativeai as genai
+from datetime import datetime
 
 # ==========================================
 # ⚙️ الإعدادات والمتغيرات (Config)
 # ==========================================
+try:
+    from config import normalize_text, CITIES_DISTRICTS, BOT_TOKEN
+    print("✅ تم تحميل الإعدادات بنجاح")
+except Exception as e:
+    print(f"❌ خطأ في تحميل ملف config.py: {e}")
+    sys.exit(1)
 
-API_ID = os.environ.get("API_ID", 33888256)
-API_HASH = os.environ.get("API_HASH", 'bb1902689a7e203a7aedadb806c08854')
-SESSION_STRING = os.environ.get("SESSION_STRING", "YOUR_SESSION_HERE")
+# --- متغيرات البيئة ---
+# إعدادات السجلات
+logging.basicConfig(level=logging.WARNING)
 
-ZONE_GROUPS = {
-    'شمال جدة': -1003760776543, 
-    'وسط جدة': -1003596443115,
-    'جنوب جدة': -1003817286093,
-    'شرق جدة': -1003771356422
-}
+# متغيرات البيئة (تأكد من تعبئتها في الاستضافة)
+API_ID = os.environ.get("API_ID", "36360458")
+API_HASH = os.environ.get("API_HASH", "daae4628b4b4aac1f0ebfce23c4fa272")
+SESSION_STRING = os.environ.get("SESSION_STRING", "1BJWap1sBu40j3ZH7Al9W21d4ghtN5RRH8mHEvqNj2MnWyhv1DVOLP86bxbf4BGk3bnuFeLCQVPKBvO2TRT8f5DWsTq-Qo8guDA0n2F6Zsb-dod4hEm3AeszVGzQp3JQmyk3HgmT2YB7hlMuA2ebcYO1jo_nRWu8Ib7ENq8XpjaTYtcrRhUfDgMBGg6ySQjhZWs4ICnAk79o3T9ICewTxZg6O2BlJMpP6kQThQRyWHGaytoadkvoL5tJcnrivDgsUSfY5r4IzrTE00RH9F7dTbuu9jeLqb2WKDZXcCM88_8gQGrB0etCtFZD7UnHydyQagi3i7pZZimgHOb_s8Xd7xPFjaP8Vuf4=")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyDtF2lEZuEvI1hTFFrPRbGwwvj7ZocdPjs")
 
-KEYWORDS = ['شهري', 'بالشهر', 'شهريا', 'عقد', 'دوام', 'مشوار ثبات']
+# إعدادات المستخدمين والقنوات
+# 🛠️ قائمة الـ IDs المحدثة (المستلمين المحددين فقط)
+TARGET_USERS = [
+    7996171713, 7513630480
+]
 
-# (قاعدة البيانات الجغرافية DISTRICT_COORDS و JEDDAH_ZONES تبقى كما هي في كودك الأصلي)
-# ... [توضع هنا مصفوفات الأحياء والإحداثيات] ...
-JEDDAH_ZONES = {
-    'شمال جدة': [
-        'أبحر الشمالية', 'أبحر الجنوبية', 'الحمدانية', 'المرجان', 'البساتين', 'النعيم', 
-        'المحمدية', 'الشاطئ', 'الرحيلي', 'ذهبان', 'طيبة', 'الصالة الشمالية', 'الفروسية',
-        'الفلاح', 'الرياض', 'الزمرد', 'الياقوت', 'اللؤلؤ', 'المنار', 'الصواري', 
-        'خالد النموذجية', 'مطار الملك عبدالعزيز', 'الأمواج', 'الفردوس', 'الشراع', 
-        'المنارات', 'الصالحية', 'الماجد', 'السلطان', 'النزهة'
-    ],
-    'وسط جدة': [
-        'الروضة', 'السلامة', 'التحلية', 'العزيزية', 'مشرفة', 'النسيم', 'الفيحاء',
-        'بني مالك', 'الحمراء', 'الفيصلية', 'الربوة', 'الصفا', 'المروة', 'البوادي',
-        'الاندلس', 'المساعدية', 'الورود', 'الرحاب', 'كندرة', 'العمارية', 'الصحيفة', 
-        'البغدادية', 'حي البلد', 'الرويس', 'الهنداوية', 'الثعالبة', 'القريات', 'السبيل'
-    ],
-    'جنوب جدة': [
-        'الوزيرية', 'الأمير فواز', 'الأمير عبدالمجيد', 'العدل', 'السنابل', 'الروابي', 
-        'الخمرة', 'غليل', 'المحجر', 'القرينية', 'الأجاويد', 'حي الهدى', 'المدائن', 
-        'الفضيلة', 'مستودعات الإسكان', 'حي بترومين', 'القوزين', 'السرورية', 'المرسلات',
-        'الأجواد الجنوبي', 'ضاحية الحرزات', 'الهدى 2'
-    ],
-    'شرق جدة': [
-        'السامر', 'المنار', 'الأجواد', 'مخطط الفهد', 'الحرازات', 'السليمانية', 
-        'الواحة', 'بريمان', 'التيسير', 'الراية', 'النخيل', 'مخطط الرياض', 
-        'حي السلمية', 'المروة الشرقية', 'أم الحبلين', 'وادي مريخ', 'مخطط مريخ',
-        'النزهة الشرقية', 'بني مالك الشرقية', 'مخطط المصباح'
-    ]
-}
+CHANNEL_ID = -1003843717541 
 
+# ==========================================
+# 🗺️ البيانات الجغرافية (من الكودAIzaSyDtF2lEZuEvI1hTFFrPRbGwwvj7ZocdPjs الأول)
+# ==========================================
+# ملاحظة: يمكنك إضافة أحياء المدينة المنورة هنا بنفس التنسيق ليقوم البوت بحساب المسافة لها أيضاً
 DISTRICT_COORDS = {
     'أبحر الشمالية': (21.7511, 39.1235), 'أبحر الجنوبية': (21.7144, 39.1256),
     'الحمدانية': (21.7831, 39.2161), 'المرجان': (21.7011, 39.1022),
@@ -69,71 +59,106 @@ DISTRICT_COORDS = {
     'الفردوس': (21.7400, 39.1200), 'الشراع': (21.7250, 39.1150),
     'المنارات': (21.7100, 39.1300), 'الصالحية': (21.7950, 39.2100),
     'الماجد': (21.8050, 39.2200), 'السلطان': (21.8100, 39.2150),
-    'النزهة': (21.6400, 39.1700),
-    'الروضة': (21.5667, 39.1500), 'السلامة': (21.5833, 39.1500),
-    'التحلية': (21.5510, 39.1650), 'العزيزية': (21.5450, 39.1850),
-    'مشرفة': (21.5350, 39.1950), 'النسيم': (21.5050, 39.2250),
-    'الفيحاء': (21.4950, 39.2350), 'بني مالك': (21.5150, 39.2150),
-    'الحمراء': (21.5200, 39.1550), 'الفيصلية': (21.5750, 39.1750),
-    'الربوة': (21.5950, 39.1850), 'الصفا': (21.5850, 39.2050),
-    'المروة': (21.6150, 39.2050), 'البوادي': (21.5950, 39.1650),
-    'الاندلس': (21.5400, 39.1450), 'المساعدية': (21.5300, 39.1700),
-    'الورود': (21.5250, 39.2150), 'الرحاب': (21.5550, 39.2150),
-    'كندرة': (21.4950, 39.2050), 'العمارية': (21.4880, 39.1950),
-    'الصحيفة': (21.4850, 39.1900), 'البغدادية': (21.4950, 39.1850),
-    'حي البلد': (21.4833, 39.1833), 'الرويس': (21.5100, 39.1650),
-    'الهنداوية': (21.4750, 39.1800), 'الثعالبة': (21.4650, 39.1850),
-    'القريات': (21.4600, 39.1900), 'السبيل': (21.4700, 39.1900),
-    'الوزيرية': (21.4600, 39.2350), 'الأمير فواز': (21.4250, 39.2650),
-    'الأمير عبدالمجيد': (21.4050, 39.2750), 'العدل': (21.4550, 39.2550),
-    'السنابل': (21.3650, 39.2850), 'الروابي': (21.4750, 39.2550),
-    'الخمرة': (21.3000, 39.2200), 'غليل': (21.4450, 39.2050),
-    'المحجر': (21.4400, 39.1950), 'القرينية': (21.3250, 39.2350),
-    'الأجاويد': (21.3850, 39.2850), 'حي الهدى': (21.3950, 39.2550),
-    'المدائن': (21.3500, 39.2450), 'الفضيلة': (21.3150, 39.2550),
-    'مستودعات الإسكان': (21.4150, 39.2250), 'حي بترومين': (21.4350, 39.1850),
-    'القوزين': (21.2850, 39.2050), 'السرورية': (21.3350, 39.1950),
-    'المرسلات': (21.4000, 39.2400), 'الهدى 2': (21.3800, 39.2600),
-    'السامر': (21.6050, 39.2450), 'المنار': (21.6050, 39.2300),
-    'الأجواد': (21.6150, 39.2550), 'مخطط الفهد': (21.6250, 39.2650),
-    'الحرازات': (21.4550, 39.3650), 'السليمانية': (21.4950, 39.2450),
-    'الواحة': (21.5650, 39.2450), 'بريمان': (21.6550, 39.2550),
-    'التيسير': (21.5750, 39.2750), 'الراية': (21.6250, 39.2750),
-    'النخيل': (21.5250, 39.2650), 'مخطط الرياض': (21.8450, 39.2350),
-    'حي السلمية': (21.4450, 39.2850), 'المروة الشرقية': (21.6250, 39.2150),
-    'أم الحبلين': (21.5850, 39.2950), 'وادي مريخ': (21.5450, 39.3050),
-    'مخطط مريخ': (21.5500, 39.3100), 'مخطط المصباح': (21.5900, 39.2600)
+    'النزهة': (21.6400, 39.1700), 'الروضة': (21.5667, 39.1500), 
+    'السلامة': (21.5833, 39.1500), 'التحلية': (21.5510, 39.1650), 
+    'العزيزية': (21.5450, 39.1850), 'مشرفة': (21.5350, 39.1950), 
+    'النسيم': (21.5050, 39.2250), 'الفيحاء': (21.4950, 39.2350), 
+    'بني مالك': (21.5150, 39.2150), 'الحمراء': (21.5200, 39.1550), 
+    'الفيصلية': (21.5750, 39.1750), 'الربوة': (21.5950, 39.1850), 
+    'الصفا': (21.5850, 39.2050), 'المروة': (21.6150, 39.2050), 
+    'البوادي': (21.5950, 39.1650), 'الاندلس': (21.5400, 39.1450), 
+    'المساعدية': (21.5300, 39.1700), 'الورود': (21.5250, 39.2150), 
+    'الرحاب': (21.5550, 39.2150), 'كندرة': (21.4950, 39.2050), 
+    'العمارية': (21.4880, 39.1950), 'الصحيفة': (21.4850, 39.1900), 
+    'البغدادية': (21.4950, 39.1850), 'حي البلد': (21.4833, 39.1833), 
+    'الرويس': (21.5100, 39.1650), 'الهنداوية': (21.4750, 39.1800), 
+    'الثعالبة': (21.4650, 39.1850), 'القريات': (21.4600, 39.1900), 
+    'السبيل': (21.4700, 39.1900), 'الوزيرية': (21.4600, 39.2350), 
+    'الأمير فواز': (21.4250, 39.2650), 'الأمير عبدالمجيد': (21.4050, 39.2750), 
+    'العدل': (21.4550, 39.2550), 'السنابل': (21.3650, 39.2850), 
+    'الروابي': (21.4750, 39.2550), 'الخمرة': (21.3000, 39.2200), 
+    'غليل': (21.4450, 39.2050), 'المحجر': (21.4400, 39.1950), 
+    'القرينية': (21.3250, 39.2350), 'الأجاويد': (21.3850, 39.2850), 
+    'حي الهدى': (21.3950, 39.2550), 'المدائن': (21.3500, 39.2450), 
+    'الفضيلة': (21.3150, 39.2550), 'مستودعات الإسكان': (21.4150, 39.2250), 
+    'حي بترومين': (21.4350, 39.1850), 'القوزين': (21.2850, 39.2050), 
+    'السرورية': (21.3350, 39.1950), 'المرسلات': (21.4000, 39.2400), 
+    'الهدى 2': (21.3800, 39.2600), 'السامر': (21.6050, 39.2450), 
+    'المنار': (21.6050, 39.2300), 'الأجواد': (21.6150, 39.2550), 
+    'مخطط الفهد': (21.6250, 39.2650), 'الحرازات': (21.4550, 39.3650), 
+    'السليمانية': (21.4950, 39.2450), 'الواحة': (21.5650, 39.2450), 
+    'بريمان': (21.6550, 39.2550), 'التيسير': (21.5750, 39.2750), 
+    'الراية': (21.6250, 39.2750), 'النخيل': (21.5250, 39.2650), 
+    'مخطط الرياض': (21.8450, 39.2350), 'حي السلمية': (21.4450, 39.2850), 
+    'المروة الشرقية': (21.6250, 39.2150), 'أم الحبلين': (21.5850, 39.2950), 
+    'وادي مريخ': (21.5450, 39.3050), 'مخطط مريخ': (21.5500, 39.3100), 
+    'مخطط المصباح': (21.5900, 39.2600)
 }
 
+# قوائم الفلترة (من الكود الثاني - محدثة)
+BLOCK_KEYWORDS = [
+    "متواجد", "متاح", "شغال", "جاهز", "أسعارنا", "سيارة نظيفة", "نقل عفش", 
+    "دربك سمح", "توصيل مشاوير", "أوصل", "اوصل", "اتصال", "واتساب", "للتواصل",
+    "خاص", "الخاص", "بخدمتكم", "خدمتكم", "أستقبل", "استقبل", "نقل بضائع",
+    "مشاويركم", "سياره نظيفه", "فان", "دباب", "سطحه", "سطحة", "كابتن", 
+    "مندوب", "مناديب", "توصيل طلبات", "ارخص الأسعار", "أرخص الأسعار", "بأسعار",
+    "عقار", "عقارات", "للبيع", "للإيجار", "للايجار", "دور", "شقة", "شقه",
+    "رخصة فال", "رخصة", "رخصه", "مخطط", "أرض", "ارض", "فلة", "فله", 
+    "عماره", "عمارة", "استثمار", "صك", "إفراغ", "الوساطة العقارية", "تجاري", "سكني",
+    "اشتراك", "باقات", "تسجيل", "تأمين", "تفويض", "تجديد", "قرض", "تمويل", 
+    "بنك", "تسديد", "مخالفات", "اعلان", "إعلان", "قروب", "مجموعة", "انضم", 
+    "رابط", "نشر", "قوانين", "احترام", "الذوق العام", "استقدام", "خادمات",
+    "تعقيب", "معقب", "انجاز", "إنجاز", "كفيل", "نقل كفالة", "اسقاط", "تعديل مهنة",
+    "حياك الله", "نورتنا", "انضمامك", "أهلاً بك", "اهلا بك", "قواعد المجموعة",
+    "مرحباً بك", "مرحبا بك", "تنبيه", "محظور", "يُمنع", "يمنع", "بالتوفيق للجميع",
+    "http", "t.me", ".com", "رابط القناة", "اخلاء مسؤولية", "ذمة",
+    "استثمار", "زواج", "مسيار", "خطابه", "خطابة"
+]
+
+IRRELEVANT_TOPICS = [
+    "عيادة", "عياده", "اسنان", "أسنان", "دكتور", "طبيب", "مستشفى", "مستوصف",
+    "علاج", "تركيب", "تقويم", "خلع", "حشو", "تنظيف", "استفسار", "افضل", "أفضل",
+    "تجربة", "مين جرب", "رأيكم", "تنصحون", "ورشة", "سمكري", "قطع غيار",
+    "عذر طبي", "سكليف", "سكليفات"
+]
 
 # ==========================================
-# 🛠️ المحرك الذكي (Intelligence Engine)
+# 🧠 دوال المساعدة (Logic Helpers)
 # ==========================================
 
-def normalize_arabic_text(text):
+def normalize_text(text):
     if not text: return ""
-    text = text.strip()
     text = re.sub(r'[أإآ]', 'ا', text)
     text = re.sub(r'ة', 'ه', text)
-    tashkeel = re.compile(r'[\u064B-\u0652]')
-    text = re.sub(tashkeel, '', text)
-    text = re.sub(r'http\S+|www\S+|@\S+', '', text)
+    text = re.sub(r'ى', 'ي', text)
     return text
 
 def extract_smart_details(text):
-    """استخراج السعر وعدد الركاب من النص"""
-    price_match = re.search(r'(\d{3,4})\s?(ريال|ر|السعر)', text)
+    """استخراج السعر وعدد الركاب (من الكود الأول)"""
+    price_match = re.search(r'(\d{1,4})\s?(ريال|ر|السعر|دفع)', text)
     passengers_match = re.search(r'(عدد|احنا|ركاب)\s?(\d)', text)
-    
-    price = price_match.group(1) if price_match else "بالاتفاق"
-    passengers = passengers_match.group(2) if passengers_match else "1"
+
+    price = price_match.group(1) if price_match else None
+    passengers = passengers_match.group(2) if passengers_match else None
     return price, passengers
 
 def calculate_distance(origin_name, dest_name):
-    coords1 = DISTRICT_COORDS.get(origin_name)
-    coords2 = DISTRICT_COORDS.get(dest_name)
-    if not coords1 or not coords2: return None, None
+    """حساب المسافة والوقت بناءً على الإحداثيات (من الكود الأول)"""
+    # تنظيف المدخلات لمحاولة إيجاد تطابق في القاموس
+    norm_origin = normalize_text(origin_name)
+    norm_dest = normalize_text(dest_name)
     
+    # البحث عن المفاتيح في القاموس
+    coords1 = None
+    coords2 = None
+    
+    # محاولة مطابقة مرنة
+    for k, v in DISTRICT_COORDS.items():
+        if normalize_text(k) in norm_origin: coords1 = v
+        if normalize_text(k) in norm_dest: coords2 = v
+    
+    if not coords1 or not coords2: return None, None
+
     lat1, lon1 = coords1
     lat2, lon2 = coords2
     R = 6371
@@ -141,116 +166,210 @@ def calculate_distance(origin_name, dest_name):
     dlon = math.radians(lon2 - lon1)
     a = (math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2)
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    
-    actual_dist = round(R * c * 1.3, 1)
-    est_time = round((actual_dist / 40) * 60) + 10
+
+    actual_dist = round(R * c * 1.3, 1) # ضرب في 1.3 لتقدير تعرجات الطرق
+    est_time = round((actual_dist / 40) * 60) + 5 # متوسط سرعة 40 كم/س
     return actual_dist, est_time
 
 # ==========================================
-# 🧠 منطق المعالجة المطور
+# 🤖 الذكاء الاصطناعي (Gemini Logic)
 # ==========================================
 
-client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
-pending_orders = {zone: [] for zone in JEDDAH_ZONES.keys()}
+genai.configure(api_key=GEMINI_API_KEY)
+ai_model = genai.GenerativeModel(
+    model_name="gemini-1.5-flash",
+    generation_config={"temperature": 0.1, "max_output_tokens": 5}
+)
 
-@client.on(events.NewMessage)
-async def main_handler(event):
-    if not event.is_group: return
-    raw_text = event.raw_text
-    if not raw_text: return
+async def analyze_message_hybrid(text):
+    if not text or len(text) < 5 or len(text) > 400: return False
 
-    processed_text = normalize_arabic_text(raw_text)
-    if not any(normalize_arabic_text(k) in processed_text for k in KEYWORDS): return
+    clean_text = normalize_text(text)
+    
+    # الفلتر المحلي السريع (Local Filter)
+    if any(k in clean_text for k in BLOCK_KEYWORDS): return False
+    if any(k in clean_text for k in IRRELEVANT_TOPICS): return False
 
-    origin, dest, found_zone = "غير محدد", "غير محدد", None
+    # البرومبت الشامل (Master Prompt)
+    prompt = f"""
+    Role: You are an elite AI Traffic Controller.
+    Objective: Filter messages to identify REAL CUSTOMERS seeking services (Rides, Delivery, School Transport).
+    
+    [STRICT ANALYSIS RULES]
+    - SENDER = CUSTOMER (Needs service) -> Reply 'YES'
+    - SENDER = DRIVER (Offers service) -> Reply 'NO'
+    - SENDER = SPAM/CHATTER -> Reply 'NO'
 
-    # تحليل المواقع
-    for zone, districts in JEDDAH_ZONES.items():
-        for d in districts:
-            norm_d = normalize_arabic_text(d)
-            if norm_d in processed_text:
-                if ' من ' + norm_d in processed_text: origin, found_zone = d, zone
-                elif ' الى ' + norm_d in processed_text or ' لحي ' + norm_d in processed_text: dest = d
-                else:
-                    if origin == "غير محدد": origin, found_zone = d, zone
+    [✅ CLASSIFY AS 'YES' (CUSTOMER REQUESTS)]
+    1. Explicit Ride Requests: (e.g., "أبغى سواق", "مطلوب كابتن", "سيارة للحرم").
+    2. Route Descriptions: (e.g., "من العزيزية للحرم", "إلى الراشد مول").
+    3. Location Pings: (e.g., "حي شوران؟", "أحد حول العالية؟").
+    4. School/Work/Monthly: (e.g., "توصيل مدارس", "نقل طالبات", "عقد شهري", "دوام").
+    5. Delivery: (e.g., "توصيل غرض", "توصيل مفتاح").
+    6. Price Inquiries: (e.g., "بكم المشوار للمطار؟").
 
-    if found_zone:
+    [❌ CLASSIFY AS 'NO' (IGNORE THESE)]
+    1. Driver Offers: (e.g., "متواجد", "جاهز", "سيارة حديثة").
+    2. Spam Topics: (Medical excuses, Marriage/Misyar, Loans, Real Estate).
+    3. General Chat: Greetings or admin messages.
+
+    [DECISION LOGIC]
+    - "From A to B" -> YES
+    - "I am available" -> NO
+    - "School delivery needed" -> YES
+    - "Sick leave for sale" -> NO
+
+    Input Text: "{text}"
+    FINAL ANSWER (Reply ONLY with 'YES' or 'NO'):
+    """
+
+    try:
+        response = await asyncio.to_thread(ai_model.generate_content, prompt)
+        return "YES" in response.text.strip().upper()
+    except Exception as e:
+        print(f"⚠️ تجاوز AI: {e}")
+        # احتياطي يدوي (Regex)
+        return any(w in clean_text for w in ["سواق", "توصيل", "مشوار", "ابي", "ابغى", "مطلوب"])
+
+# ==========================================
+# 📨 نظام الإرسال الموحد (Dispatch System)
+# ==========================================
+
+user_app = Client("my_session", session_string=SESSION_STRING, api_id=API_ID, api_hash=API_HASH)
+bot_sender = Bot(token=BOT_TOKEN)
+
+async def process_and_send(original_msg, origin="عام", dest="غير محدد"):
+    content = original_msg.text or original_msg.caption
+    customer = original_msg.from_user
+    customer_id = customer.id if customer else 0
+    msg_id = original_msg.id
+    chat_id_raw = original_msg.chat.id
+    chat_id_clean = str(chat_id_raw).replace("-100", "")
+    bot_username = "Mishwariibot" # استبدله بيوزر بوتك الصحيح
+
+    # 1. استخراج المعلومات الذكية (سعر، ركاب، مسافة)
+    price, passengers = extract_smart_details(content)
+    dist, time = calculate_distance(origin, dest)
+
+    # تجهيز النص الإضافي
+    extra_info = ""
+    if price: extra_info += f"💰 <b>السعر المقترح:</b> {price} ريال\n"
+    if passengers: extra_info += f"👥 <b>الركاب:</b> {passengers}\n"
+    if dist: extra_info += f"📏 <b>المسافة:</b> {dist} كم (~{time} دقيقة)\n"
+
+    # 2. الإرسال للقناة العامة (روابط محمية)
+    gate_contact = f"https://t.me/{bot_username}?start=contact_{customer_id}_{msg_id}"
+    gate_source = f"https://t.me/{bot_username}?start=source_{chat_id_raw}_{msg_id}"
+    
+    channel_btns = InlineKeyboardMarkup([
+        [InlineKeyboardButton("💬 مراسلة العميل (للمشتركين)", url=gate_contact)],
+        [InlineKeyboardButton("🔗 مصدر الطلب (للمشتركين)", url=gate_source)],
+        [InlineKeyboardButton("💳 للاشتراك وتفعيل الحساب", url="https://t.me/x3FreTx")]
+    ])
+
+    base_text = (
+        f"🎯 <b>طلب مشوار جديد</b>\n\n"
+        f"📍 <b>من:</b> {origin}\n"
+        f"🏁 <b>إلى:</b> {dest}\n"
+        f"{extra_info}"
+        f"📝 <b>النص:</b> <i>{content[:200]}</i>\n\n"
+        f"⏰ <b>{datetime.now().strftime('%H:%M')}</b>"
+    )
+
+    try:
+        await bot_sender.send_message(chat_id=CHANNEL_ID, text=base_text, reply_markup=channel_btns, parse_mode=ParseMode.HTML)
+    except Exception as e: print(f"❌ خطأ القناة: {e}")
+
+    # 3. الإرسال للمستخدمين المحددين (روابط مباشرة)
+    direct_contact = f"https://t.me/{customer.username}" if customer and customer.username else f"tg://user?id={customer_id}"
+    direct_source = f"https://t.me/c/{chat_id_clean}/{msg_id}"
+
+    user_btns = InlineKeyboardMarkup([
+        [InlineKeyboardButton("💬 مراسلة العميل مباشرة", url=direct_contact)],
+        [InlineKeyboardButton("🔗 الذهاب للمصدر", url=direct_source)]
+    ])
+
+    for user_id in TARGET_USERS:
         try:
-            dist, time = calculate_distance(origin, dest)
-            price, passengers = extract_smart_details(raw_text)
-            sender = await event.get_sender()
-            
-            chat = await event.get_chat()
-            chat_id = str(chat.id).replace("-100", "")
-            msg_url = f"https://t.me/c/{chat_id}/{event.message.id}"
+            await bot_sender.send_message(chat_id=user_id, text=f"🚀 <b>طلب خاص لك:</b>\n\n{base_text}", reply_markup=user_btns, parse_mode=ParseMode.HTML)
+        except Exception as e: print(f"⚠️ فشل إرسال لـ {user_id}: {e}")
 
-            new_order = {
-                'origin': origin, 'dest': dest, 'dist': dist, 'time': time,
-                'price': price, 'passengers': passengers,
-                'name': sender.first_name if sender else "عميل",
-                'link': f"tg://user?id={sender.id}" if sender else "#",
-                'msg_url': msg_url,
-                'raw': raw_text[:100]
-            }
+# ==========================================
+# 📡 الرادار الرئيسي (Main Loop)
+# ==========================================
 
-            if not pending_orders[found_zone]:
-                pending_orders[found_zone].append(new_order)
-                asyncio.create_task(process_and_send_batch(found_zone))
-            else:
-                pending_orders[found_zone].append(new_order)
+async def start_radar():
+    await user_app.start()
+    print("🚀 الرادار المدمج (Super Bot) يعمل الآن...")
+    
+    # رسالة تنبيه عند البدء
+    if TARGET_USERS:
+        try:
+            await bot_sender.send_message(TARGET_USERS[-1], "✅ تم تشغيل البوت بنظامه الجديد")
+        except: pass
+
+    last_processed = {}
+
+    while True:
+        try:
+            await asyncio.sleep(4) # انتظار لتقليل الضغط
+            async for dialog in user_app.get_dialogs(limit=50):
+                if str(dialog.chat.type).upper() not in ["GROUP", "SUPERGROUP"]: continue
                 
+                chat_id = dialog.chat.id
+                async for msg in user_app.get_chat_history(chat_id, limit=1):
+                    if chat_id in last_processed and msg.id <= last_processed[chat_id]: continue
+                    last_processed[chat_id] = msg.id
+                    
+                    text = msg.text or msg.caption
+                    if not text or (msg.from_user and msg.from_user.is_self): continue
+
+                    # 1. التحليل بالذكاء الاصطناعي
+                    if await analyze_message_hybrid(text):
+                        
+                        # 2. محاولة استخراج المناطق (Origin/Dest) من النص
+                        origin_found = "غير محدد"
+                        dest_found = "غير محدد"
+                        
+                        text_norm = normalize_text(text)
+                        
+                        # بحث بسيط عن المناطق في القاموس
+                        # (يمكن تطوير هذا الجزء ليكون أذكى باستخدام "من" و "إلى")
+                        tokens = text_norm.split()
+                        matches = []
+                        for district in DISTRICT_COORDS.keys():
+                            d_norm = normalize_text(district)
+                            if d_norm in text_norm:
+                                matches.append(district)
+                        
+                        # تخمين المنطلق والوجهة
+                        if len(matches) >= 1: origin_found = matches[0]
+                        if len(matches) >= 2: dest_found = matches[1]
+                        
+                        # في حال لم يجد مناطق من القاموس، يحاول البحث عن كلمة بعد "من"
+                        if origin_found == "غير محدد":
+                             m_from = re.search(r'من\s+(\w+)', text_norm)
+                             if m_from: origin_found = m_from.group(1)
+
+                        await process_and_send(msg, origin=origin_found, dest=dest_found)
+
         except Exception as e:
-            print(f"❌ Error: {e}")
+            print(f"⚠️ خطأ في الدورة: {e}")
+            await asyncio.sleep(5)
 
-async def process_and_send_batch(zone):
-    await asyncio.sleep(3000)  # زيادة الوقت لـ 10 دقائق لضمان التوافق
-    
-    orders = pending_orders[zone]
-    if not orders: return
-    pending_orders[zone] = []
-
-    batch_msg = f"🚚 **حزمة المسارات الذكية | {zone}**\n"
-    batch_msg += "━━━━━━━━━━━━━━━━━━\n\n"
-
-    # تصنيف ذكي: تجميع المشاوير التي لها نفس الوجهة أو وجهات قريبة
-    clusters = {}
-    for o in orders:
-        clusters.setdefault(o['dest'], []).append(o)
-
-    for d_name, group in clusters.items():
-        batch_msg += f"📍 **الوجهة النهائية: {d_name}**\n"
-        
-        # إذا وجدنا أكثر من طلب لنفس الوجهة نضع علامة "توافق"
-        if len(group) > 1:
-            batch_msg += "✨ *يوجد توافق عالي لهذا المسار للسائقين*\n"
-            
-        for o in group:
-            batch_msg += (
-                f"🔸 من: `{o['origin']}`\n"
-                f"💰 السعر: `{o['price']}` | 👥 ركاب: `{o['passengers']}`\n"
-                f"👤 العميل: [{o['name']}]({o['link']})\n"
-                f"📏 المسافة: `~{o['dist']} كم` | [المصدر]({o['msg_url']})\n"
-                f"⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n"
-            )
-    
-    batch_msg += f"\n✅ تم تجميع {len(orders)} طلبات متوافقة."
-    
-    target = ZONE_GROUPS.get(zone)
-    if target:
-        await client.send_message(target, batch_msg, link_preview=False)
-
-# ... [Flask و Thread تشغيل السيرفر تبقى كما هي] ...
 # ==========================================
-# 🌐 تشغيل السيرفر
+# 🌐 تشغيل السيرفر (Flask Server)
 # ==========================================
+
 app = Flask('')
-@app.route('/')
-def home(): return "Smart Logistics Active 🚀"
 
-def run_web():
+@app.route('/')
+def home():
+    return "✅ Super Bot Logic is Active & Running."
+
+def run_flask():
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
 
-if __name__ == '__main__':
-    Thread(target=run_web).start()
-    client.start()
-    client.run_until_disconnected()
+if __name__ == "__main__":
+    threading.Thread(target=run_flask, daemon=True).start()
+    asyncio.run(start_radar())
