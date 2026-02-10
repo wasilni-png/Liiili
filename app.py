@@ -174,10 +174,7 @@ async def notify_users(detected_district, original_msg):
 
         # 2. رابط مصدر الرسالة في الجروب
         # ملاحظة: الروابط المباشرة للجروبات الخاصة تتطلب أن يكون المستخدم منضماً للجروب
-        chat_id_str = str(original_msg.chat.id).replace("-100", "")
-        msg_id = original_msg.id
-        source_url = f"https://t.me/c/{chat_id_str}/{msg_id}"
-
+        
         # 3. تجهيز الأزرار
         buttons_list = []
 
@@ -186,7 +183,7 @@ async def notify_users(detected_district, original_msg):
             buttons_list.append([InlineKeyboardButton("💬 مراسلة العميل مباشرة", url=direct_contact_url)])
 
         # زر المصدر
-        buttons_list.append([InlineKeyboardButton("🔗 الذهاب لمصدر الطلب", url=source_url)])
+       
 
         keyboard = InlineKeyboardMarkup(buttons_list)
 
@@ -238,7 +235,6 @@ async def notify_channel(detected_district, original_msg):
 
         buttons = [
             [InlineKeyboardButton("💬 مراسلة العميل (للمشتركين)", url=gate_contact)],
-            [InlineKeyboardButton("🔗 مصدر الطلب (للمشتركين)", url=gate_source)],
             [InlineKeyboardButton("💳 للاشتراك وتفعيل الحساب", url="https://t.me/x3FreTx")]
         ]
 
@@ -319,8 +315,10 @@ async def start_radar():
                                         break
 
                             # [تعديل 3] استدعاء دالة الإرسال للمستخدمين
-                            await notify_users(found_d, msg)
-
+                            
+             # ✅ [التعديل المطلوب] استدعاء الدالتين معاً
+                            await notify_users(found_d, msg)   # الإرسال للأشخاص في الخاص
+                            await notify_channel(found_d, msg) # الإرسال للقناة العامة
                 except Exception as e_chat:
                     # أحياناً يحدث خطأ في قراءة مجموعة معينة، نتجاوزها
                     continue
