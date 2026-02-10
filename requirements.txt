@@ -1,3 +1,9 @@
 telethon
+pyrogram
+tgcrypto
 flask
 asyncio
+google-generativeai
+python-telegram-bot
+requests
+httpx
